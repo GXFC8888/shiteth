@@ -11,7 +11,7 @@ const OFFICIAL_X_USERNAME = /^[A-Za-z0-9_]{1,15}$/.test(
   CONFIGURED_OFFICIAL_X_USERNAME
 )
   ? CONFIGURED_OFFICIAL_X_USERNAME
-  : "Securityaler";
+  : "GXFCRS";
 
 function escapeHtml(value) {
   return String(value || "")
