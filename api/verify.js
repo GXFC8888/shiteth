@@ -491,16 +491,20 @@ export default async function handler(req, res) {
     if (!user?.x_user_id || !user?.x_username) {
       return res.status(400).json({
         success: false,
+        code: "X_NOT_LINKED",
         error: "X authorization required",
-        message: "Please connect X first."
+        message: "Please link your X account first.",
+        requiresXLink: true
       });
     }
 
     if (!user?.x_access_token) {
       return res.status(400).json({
         success: false,
+        code: "X_TOKEN_MISSING",
         error: "X access token missing",
-        message: "Please reconnect X."
+        message: "X authorization expired. Please tap Link X.",
+        requiresXLink: true
       });
     }
 
@@ -579,9 +583,10 @@ export default async function handler(req, res) {
     if (error.code === "X_RECONNECT_REQUIRED" || error.status === 401) {
       return res.status(401).json({
         success: false,
+        code: "X_TOKEN_EXPIRED",
         error: "X authorization expired",
-        message: "Please reconnect X.",
-        reconnectX: true,
+        message: "X authorization expired. Please tap Link X.",
+        requiresXLink: true,
         verificationError: true
       });
     }
