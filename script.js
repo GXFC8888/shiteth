@@ -1165,15 +1165,18 @@ function renderMissions() {
   const bindingConflict = getXBindingConflict(activeWallet);
 
   const verifyDisabled =
-    isVerifying || noNewMissionForThisTask || Boolean(bindingConflict);
+    isVerifying ||
+    !currentXConnected ||
+    noNewMissionForThisTask ||
+    Boolean(bindingConflict);
 
-  const openDisabled = claimed || currentXConnected;
+  const openDisabled = currentXConnected;
 
-  const openButtonText = claimed
-    ? "Completed"
-    : currentXConnected
-      ? "X Authorized"
-      : "Link X";
+  const openButtonText = currentXConnected
+    ? claimed
+      ? "Completed"
+      : "X Authorized"
+    : "Link X";
 
   const verifyButtonText = isVerifying
     ? "checking..."
