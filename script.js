@@ -1612,6 +1612,28 @@ function openTaskXDirect(tweetId) {
   }, 1800);
 }
 
+function openCurrentMissionTweet(tweetId, message = "") {
+  const targetTweetId = String(
+    tweetId || currentTweetId || getLatestTask()?.tweet_id || "",
+  ).trim();
+
+  if (!/^\d{1,30}$/.test(targetTweetId)) {
+    showMessage("Mission post is unavailable. Please refresh and try again.", "err");
+    return false;
+  }
+
+  localStorage.setItem("pending_official_x", "true");
+  setCurrentTweetId(targetTweetId);
+
+  showMessage(
+    message || "Mission is not completed yet. Opening the current X post...",
+    "ok",
+  );
+
+  window.location.href = getXTargetUrl(targetTweetId);
+  return true;
+}
+
 function shouldLockClaimButton(data) {
   if (data && (data.lockClaim || data.alreadyClaimed)) {
     return true;
@@ -1888,7 +1910,10 @@ async function verifyAndClaim(task) {
           retryable: Boolean(verifyData.retryable),
         });
 
-        showMessage("");
+        openCurrentMissionTweet(
+          verifyData.tweetId || verifyData.latestTweetId || tweetId,
+          "Verification is temporarily unavailable. Opening the current X mission...",
+        );
 
         return;
       }
@@ -1936,18 +1961,11 @@ async function verifyAndClaim(task) {
 
       setCurrentTweetId(targetTweetId);
 
-      showMessage(
+      openCurrentMissionTweet(
+        targetTweetId,
         verifyData.message ||
-          verifyData.error ||
           "Latest mission is not completed yet. Opening the exact X post...",
-        "ok",
       );
-
-      await loadTasks(false);
-
-      setTimeout(() => {
-        openTaskXDirect(targetTweetId);
-      }, 800);
 
       return;
     }
