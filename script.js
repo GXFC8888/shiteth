@@ -48,7 +48,13 @@ let currentXUsername = null;
 let pendingXCallback = null;
 
 const X_BINDING_CONFLICT_STORAGE_PREFIX = "x_binding_conflict_";
-const X_BOUND_WALLET_STORAGE_KEY = "x_bound_wallet";
+
+// Older versions stored one browser-wide "bound wallet". That value cannot
+// identify which X account the user is about to authorize, so it must never be
+// used to block a different wallet from linking a different X account.
+try {
+  localStorage.removeItem("x_bound_wallet");
+} catch {}
 
 let isConnectingWallet = false;
 let isLoadingTasks = false;
@@ -443,56 +449,6 @@ function getXBindingConflictMessage(conflict) {
   return `This X account is permanently linked to wallet ${boundWalletHint}. Please switch back to that wallet.`;
 }
 
-function setXBoundWallet(address) {
-  const wallet = normalizeWallet(address);
-
-  if (!isValidWalletAddress(wallet)) return;
-
-  try {
-    localStorage.setItem(X_BOUND_WALLET_STORAGE_KEY, wallet);
-  } catch (error) {
-    console.warn("Unable to save X bound wallet state:", error);
-  }
-}
-
-function getXBoundWallet() {
-  try {
-    const storedWallet = normalizeWallet(
-      localStorage.getItem(X_BOUND_WALLET_STORAGE_KEY),
-    );
-
-    if (isValidWalletAddress(storedWallet)) {
-      return storedWallet;
-    }
-
-    const legacyBoundWallets = [];
-
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-
-      if (!key || !key.startsWith("x_connected_")) continue;
-      if (localStorage.getItem(key) !== "true") continue;
-
-      const wallet = normalizeWallet(key.slice("x_connected_".length));
-
-      if (isValidWalletAddress(wallet)) {
-        legacyBoundWallets.push(wallet);
-      }
-    }
-
-    const uniqueWallets = [...new Set(legacyBoundWallets)];
-
-    if (uniqueWallets.length === 1) {
-      setXBoundWallet(uniqueWallets[0]);
-      return uniqueWallets[0];
-    }
-
-    return "";
-  } catch (error) {
-    return "";
-  }
-}
-
 function getLatestTask() {
   if (!currentTasks.length) return null;
 
@@ -875,13 +831,6 @@ async function synchronizeWalletStateFromProvider() {
       };
     }
 
-    const boundWallet = getXBoundWallet() ||
-      (currentXConnected ? displayedWallet : "");
-
-    if (boundWallet && boundWallet !== providerWallet) {
-      setXBindingConflict(providerWallet, shortAddress(boundWallet));
-    }
-
     await setupWalletAfterConnected(false);
 
     return {
@@ -1200,19 +1149,12 @@ async function loadTasks(runPendingActions = true) {
     if (requestWallet) {
       if (currentXConnected) {
         setXConnected(requestWallet);
-        setXBoundWallet(requestWallet);
         clearXBindingConflict(requestWallet);
 
         if (currentXUsername) {
           localStorage.setItem("x_username", currentXUsername);
         }
       } else {
-        const boundWallet = getXBoundWallet();
-
-        if (boundWallet && boundWallet !== requestWallet) {
-          setXBindingConflict(requestWallet, shortAddress(boundWallet));
-        }
-
         clearXConnected(requestWallet);
 
         localStorage.removeItem("x_username");
@@ -1468,12 +1410,6 @@ function renderMissions() {
 
   if (openButton) {
     openButton.addEventListener("click", () => {
-      if (bindingConflict) {
-        showCustomAlert(getXBindingConflictMessage(bindingConflict));
-
-        return;
-      }
-
       if (claimed) {
         showMessage("Latest mission already claimed.", "ok");
 
@@ -1509,13 +1445,11 @@ function openTaskX(tweetId) {
     return;
   }
 
-  const bindingConflict = getXBindingConflict(activeWallet);
-
-  if (bindingConflict) {
-    showCustomAlert(getXBindingConflictMessage(bindingConflict));
-
-    return;
-  }
+  // A previous OAuth attempt may have selected an X account that belongs to a
+  // different wallet. Link X must still allow a retry so the user can choose a
+  // new X account; the callback remains the authority that enforces permanent
+  // X-account-to-wallet binding.
+  clearXBindingConflict(activeWallet);
 
   const latestTask = getLatestTask();
 
@@ -2121,7 +2055,6 @@ function handleUrlStatus() {
 
       localStorage.setItem("pending_x_wallet", walletFromUrl);
       setXConnected(walletFromUrl);
-      setXBoundWallet(walletFromUrl);
     }
 
     if (xUsernameFromUrl) {
