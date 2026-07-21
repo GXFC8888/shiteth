@@ -17,6 +17,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid wallet address" });
     }
 
+    const { error: cleanupError } = await supabase
+      .from("oauth_states")
+      .delete()
+      .lt("expires_at", new Date().toISOString());
+
+    if (cleanupError) {
+      console.warn("Expired OAuth state cleanup failed:", cleanupError);
+    }
+
     const client = getOAuthClient();
 
     const { url, codeVerifier, state } = client.generateOAuth2AuthLink(
